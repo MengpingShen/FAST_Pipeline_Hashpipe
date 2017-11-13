@@ -6,6 +6,7 @@ Required:
   Hashpipe
   Ruby 2.1.2
   Install information: See: https://github.com/peterniuzai/Work_memo.git/hashpipe_install.pdf
+
 Make file  
   This pipeline including c for hashpipe and c++ for filterbank data formate convert(Written by K.J.Li).
   ./make_cmd  
