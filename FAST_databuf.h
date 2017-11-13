@@ -7,36 +7,37 @@
 #define CACHE_ALIGNMENT         64
 #define N_INPUT_BLOCKS          3 
 #define N_OUTPUT_BLOCKS         3
+#define TEST			0
 
-#define N_CHAN_PER_PACK		2048		//number of channels per packet
-#define N_PACKETS_PER_SPEC	2		//number of packets per spectrum
-#define N_BYTES_DATA_POINT	1		// number of bytes per datapoint in packet
-#define N_POLS_CHAN		2		//number of polarizations per packet
-#define N_BYTES_HEADER		8		// number bytes of header
-#define N_BITS_DATA_POINT       N_BYTES_DATA_POINT*8 // number of bits per datapoint in packet
-#define N_CHANS_SPEC		(N_CHAN_PER_PACK * N_PACKETS_PER_SPEC) //Does not including poles in spec. if we have 4 polarition, the total chanels should time 4
-#define DATA_SIZE_PACK		(unsigned long)(N_CHAN_PER_PACK * N_POLS_CHAN *  N_BYTES_DATA_POINT) //(4096 MBytes)doesn't include header for each packet size 
-#define PKTSIZE			(DATA_SIZE_PACK + N_BYTES_HEADER)
-#define N_BYTES_PER_SPEC	(DATA_SIZE_PACK*N_PACKETS_PER_SPEC)//including all 4 poles
-#define N_SPEC_BUFF		32//128*2//1024//128*4
-#define BUFF_SIZE		(unsigned long)(N_SPEC_BUFF*N_BYTES_PER_SPEC) // including all 4 polaration
-#define N_CHANS_BUFF		(N_SPEC_BUFF*N_CHANS_SPEC)     // Does not including poles
-#define N_SPEC_PER_FILE		120320//960000//20096  // int(time(s)/T_samp(s)/N_SPEC_BUFF)*N_SPEC_BUFF   (20/0.001/128*128)
-#define N_MBYTES_PER_FILE	(N_SPEC_PER_FILE * N_BYTES_PER_SPEC /1024/ N_POLS_CHAN) // we can save (I,Q,U,V) polaration  into disk. Note Here We use Mbytes. Kb
-//extern unsigned long long miss_pkt;
+#define N_CHAN_PER_PACK		2048			//Number of channels per packet
+#define N_PACKETS_PER_SPEC	2			//Number of packets per spectrum
+#define N_BYTES_DATA_POINT	1			//Number of bytes per datapoint
+#define N_POLS_CHAN		2			//Number of polarizations per packet
+#define N_BYTES_HEADER		8			//Number of Bytes of header
+#define N_SPEC_BUFF             512			//Number of spectrums per buffer
+#define N_BITS_DATA_POINT       N_BYTES_DATA_POINT*8 	//Number of bits per datapoint in packet
+#define N_CHANS_SPEC		(N_CHAN_PER_PACK * N_PACKETS_PER_SPEC) 					//Channels in spectrum for 1 pole.
+#define DATA_SIZE_PACK		(unsigned long)(N_CHAN_PER_PACK * N_POLS_CHAN *  N_BYTES_DATA_POINT) 	//Packet size without Header 
+#define PKTSIZE			(DATA_SIZE_PACK + N_BYTES_HEADER)					//Total Packet size 
+#define N_BYTES_PER_SPEC	(DATA_SIZE_PACK*N_PACKETS_PER_SPEC)					//Spectrum size with polarations
+#define BUFF_SIZE		(unsigned long)(N_SPEC_BUFF*N_BYTES_PER_SPEC) 				//Buffer size with polarations
+#define N_CHANS_BUFF		(N_SPEC_BUFF*N_CHANS_SPEC)     						//Channels in one buffer without polarations
+#define N_SPEC_PER_FILE		120320 			// Number of spectrums per file \
+				int{time(s)/T_samp(s)/N_SPEC_BUFF}*N_SPEC_BUFF  e.g. 20s data: int(20/0.001/128)*128
+#define N_BYTES_PER_FILE	(N_SPEC_PER_FILE * N_BYTES_PER_SPEC / N_POLS_CHAN) 			// we can save (I,Q,U,V) polaration into disk. 
+
+
 
 // Used to pad after hashpipe_databuf_t to maintain cache alignment
 typedef uint8_t hashpipe_databuf_cache_alignment[
   CACHE_ALIGNMENT - (sizeof(hashpipe_databuf_t)%CACHE_ALIGNMENT)
 ];
 
-//Define Stocks Parameter I.Q.U.V. Data stracture
+//Define Stocks Parameter I.Q.U.V. Data structure
 typedef struct polar_data {
 
-   char Polar1[N_CHANS_BUFF];
-   char Polar2[N_CHANS_BUFF];
- //  char U[N_CHANS_BUFF];
-//   char V[N_CHANS_BUFF];
+   uint8_t Polar1[N_CHANS_BUFF];
+   uint8_t Polar2[N_CHANS_BUFF];
 
 }polar_data_t;
 
@@ -53,9 +54,11 @@ typedef uint8_t FAST_input_header_cache_alignment[
 ];
 
 typedef struct FAST_input_block {
+
    FAST_input_block_header_t header;
    FAST_input_header_cache_alignment padding; // Maintain cache alignment
-   char  data[BUFF_SIZE];//*sizeof(char)];//512 FFT channels * 4 IFs * 2bytes = 4096Bytes
+   uint8_t  data[N_CHANS_BUFF * N_POLS_CHAN]; //Input buffer for all channels
+
 } FAST_input_block_t;
 
 typedef struct FAST_input_databuf {

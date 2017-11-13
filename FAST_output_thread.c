@@ -15,37 +15,42 @@
 #include <sys/time.h>
 //#include "FAST_net_thread.h"
 //#include "FAST_net_thread.c"
-static int block_idx=0;
-extern bool store_flag;
+//static int block_idx=0;
+//extern bool store_flag;
+extern long  miss_gap;
 static void *run(hashpipe_thread_args_t * args)
 {
-	printf("\n%ld Mbytes for each Filterbank file.\n ",N_MBYTES_PER_FILE);
+	printf("\n%f Mbytes for each Filterbank file.\n ",float(N_BYTES_PER_FILE)/1024/1024);
 	printf("\n%d Channels per Buff.\n ",N_CHANS_BUFF);
 	// Local aliases to shorten access to args fields
 	// Our input buffer happens to be a FAST_ouput_databuf
 	FAST_output_databuf_t *db = (FAST_output_databuf_t *)args->ibuf;
 	hashpipe_status_t st = args->st;
 	const char * status_key = args->thread_desc->skey;
-	int rv;
-	uint64_t N_Mbytes_save = 0;
-	uint64_t N_Mbytes_file = N_MBYTES_PER_FILE;
+	int rv, N_files;
+	int block_idx = 0;
+	uint64_t N_Bytes_save = 0;
+	uint64_t N_Bytes_file = N_BYTES_PER_FILE;
 	int filb_flag = 1;
 	FILE * FAST_file;
+	sleep(1);
 
 	/* Main loop */
 	while (run_threads()) {
 		hashpipe_status_lock_safe(&st);
 		hputi4(st.buf, "OUTBLKIN", block_idx);
-		hputi8(st.buf, "DATSAVMB",N_Mbytes_save/1024);
+		hputi8(st.buf, "DATSAVMB",(N_Bytes_save/1024/1024));
+		hputi4(st.buf, "NFILESAV",N_files);
 		hputs(st.buf, status_key, "waiting");
 		hashpipe_status_unlock_safe(&st);
 
-		// get new data
+		// Wait for data to storage
 		while ((rv=FAST_output_databuf_wait_filled(db, block_idx))
 		!= HASHPIPE_OK) {
 		if (rv==HASHPIPE_TIMEOUT) {
 			hashpipe_status_lock_safe(&st);
 			hputs(st.buf, status_key, "blocked");
+			hputi4(st.buf, "OUTBLKIN", block_idx);
 			hashpipe_status_unlock_safe(&st);
 			continue;
 			} else {
@@ -54,41 +59,44 @@ static void *run(hashpipe_thread_args_t * args)
 				break;
 			}
 		}
-
+		
 		hashpipe_status_lock_safe(&st);
 		hputs(st.buf, status_key, "processing");
+		hputi4(st.buf, "OUTBLKIN", block_idx);
 		hashpipe_status_unlock_safe(&st);
-
 		if (filb_flag ==1){
-		        char    f_fil[256];
-		        struct tm  *now;
+			char    f_fil[256];
+			struct tm  *now;
 			time_t rawtime;
-	                printf("START to writting!!!!!!");
-		        printf("\n\nopen new filterbank file...\n\n");
-        		time(&rawtime);
-		        now = localtime(&rawtime);
-	        	strftime(f_fil,sizeof(f_fil), "2017_Nov_03/Beam_%Y-%m-%d_%H-%M-%S.fil",now);
-//        		strftime(f_fil,sizeof(f_fil), "/tmp/ramdisk/data_%Y-%m-%d_%H-%M-%S.fil",now);
+			printf("\n\nopen new filterbank file...\n\n");
+	        	time(&rawtime);
+			now = localtime(&rawtime);
+		        strftime(f_fil,sizeof(f_fil), "/tmp/2017_Nov_12/Beam_%Y-%m-%d_%H-%M-%S.fil",now);
 			WriteHeader(f_fil);
-		        printf("write header done!\n");
-		        FAST_file=fopen(f_fil,"a+");
-	        	printf("starting write data to %s...\n",f_fil);
-					}
-
-		fwrite(db->block[block_idx].data.Polar1,sizeof(char),N_CHANS_BUFF,FAST_file);
-//                fwrite(db->block[block_idx].data.Q,sizeof(int),N_CHANS_BUFF,FAST_file);
-//		fprintf(stderr, "Buffsize: %lu",BUFF_SIZE);
-		N_Mbytes_save += BUFF_SIZE/N_POLS_CHAN/1024;		
-//		printf("\nData save:%lu\n",N_Mbytes_save);
-//		printf("\nTotal file size:%lu\n",N_Mbytes_file);
-//		printf("\nDevide?:%lu\n",N_Mbytes_save%N_Mbytes_file);
-		if (N_Mbytes_save % N_Mbytes_file ==0){
-				filb_flag = 1;
-				}
-		else{
-				filb_flag = 0;
-				}		
+			printf("write header done!\n");
+			N_files += 1;
+			FAST_file=fopen(f_fil,"a+");
+		        printf("starting write data to %s...\n",f_fil);
+		}
 	
+                fwrite(db->block[block_idx].data.Polar1,sizeof(db->block[block_idx].data.Polar1),1,FAST_file);
+		N_Bytes_save += BUFF_SIZE/N_POLS_CHAN;		
+		if (TEST){
+			printf("**Save Information**\n");
+			printf("Buffsize: %lu",BUFF_SIZE);
+			printf("flib_flag:%d\n",filb_flag);
+			printf("Data save:%f\n",float(N_Bytes_save)/1024/1024);
+			printf("Total file size:%f\n",float(N_Bytes_file)/1024/1024);
+			printf("Devide:%lu\n\n",N_Bytes_save % N_Bytes_file);
+
+			}
+
+			if (N_Bytes_save % N_Bytes_file ==0){
+					filb_flag = 1;
+					}
+			else{
+					filb_flag = 0;
+					}		
 
 		FAST_output_databuf_set_free(db,block_idx);
 		block_idx = (block_idx + 1) % db->header.n_block;

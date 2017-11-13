@@ -19,7 +19,6 @@
 //#include "FAST_net_thread.h"
 //defining a struct of type hashpipe_udp_params as defined in hashpipe_udp.h
 //unsigned long long miss_pkt = 0;
-//static long miss_gap = 0;
 static int total_packets_counted = 0;
 static hashpipe_status_t *st_p;
 static  const char * status_key;
@@ -27,7 +26,6 @@ static int init(hashpipe_thread_args_t * args)
 {
         hashpipe_status_t st = args->st;
         hashpipe_status_lock_safe(&st);
-	hputi8(st.buf,"NETMCNT",0);
 	hputi8(st.buf,"BUFMCNT",0);
         hputi8(st.buf, "NPACKETS", 0);
         hputi8(st.buf, "DATSAVMB",0);
@@ -48,7 +46,6 @@ typedef struct {
 
 typedef struct {
     uint64_t 	cur_mcnt;
-    uint64_t	net_mcnt;
     long 	miss_pkt;
     long   	offset;
     int         initialized;
@@ -81,13 +78,17 @@ static inline void get_header( packet_header_t * pkt_header, char *packet)
     uint64_t raw_header;
 //    raw_header = le64toh(*(unsigned long long *)p->data);
     memcpy(&raw_header,packet,N_BYTES_HEADER*sizeof(char));
-//    fprintf(stderr,"Header raw: %lu \n",raw_header);
-    pkt_header->mcnt        =  raw_header	& 0x00ffffffffffffff;
-    pkt_header->source_from = (raw_header >> 7) & 0x0000000000000001;
-    pkt_header->beam_type   = (raw_header >> 6) & 0x0000000000000001;
-    pkt_header->beam_ID     = (raw_header >> 1) & 0x3f00000000000000;
-    pkt_header->data_type   = (raw_header >> 0) & 0x0100000000000000;
-//    fprintf(stderr,"Mcnt of header is :%lu \n ",pkt_header->mcnt);
+    pkt_header->mcnt        = raw_header  & 0x00ffffffffffffff; 
+    pkt_header->source_from = raw_header  & 0x8000000000000000; //0 - power spectra, 1 - pure ADC sample
+    pkt_header->beam_type   = raw_header  & 0x4000000000000000; //0 - single beam, 1 - multi-beam
+    pkt_header->beam_ID     = raw_header  & 0x3e00000000000000; //5 bits, 32 values for beam. multi-beam: 1-19
+    pkt_header->data_type   = raw_header  & 0x0100000000000000; //spectra: 0 - power term, 1 - cross term
+    if (TEST){
+	    fprintf(stderr,"**Header**\n");
+	    fprintf(stderr,"Mcnt of Header is :%lu \n ",pkt_header->mcnt);
+	    fprintf(stderr,"Raw Header: %lu \n",raw_header);
+	    fprintf(stderr,"Seq Number:%lu\n\n",pkt_header->mcnt%2);
+	}
 }
 
 static inline void miss_pkt_process( uint64_t pkt_mcnt, FAST_input_databuf_t *db) 
@@ -98,8 +99,6 @@ static inline void miss_pkt_process( uint64_t pkt_mcnt, FAST_input_databuf_t *db
     int rv;
 
     if (((binfo.offset + miss_size ) >= BUFF_SIZE) && (miss_size < BUFF_SIZE)){
-	printf("ENa!!!!!!!!");
-	exit(1);
 
         while (( rv = FAST_input_databuf_wait_free(db, binfo.block_idx))!= HASHPIPE_OK) {
               if (rv==HASHPIPE_TIMEOUT) {
@@ -140,18 +139,20 @@ static inline void miss_pkt_process( uint64_t pkt_mcnt, FAST_input_databuf_t *db
      }
     
     else if(miss_size > BUFF_SIZE){
-		 printf("SYSTEM mcnt:%lu \n", binfo.cur_mcnt);
+		 printf("SYSTEM mcnt:%lu \n\n", binfo.cur_mcnt);
                  printf("Packet mcnt:%lu \n", pkt_mcnt);
 		 printf("Miss_size:%lu \n",miss_size);
-		 printf("BUFF_SIZE: %lu \n",BUFF_SIZE);
-		 fprintf(stderr,"Missing Pkt much more than one Buffer...");
+		 printf("BUFF_SIZE: %lu \n\n",BUFF_SIZE);
+		 fprintf(stderr,"Missing Pkt much more than one Buffer...\n");
                  pthread_exit(NULL);
+		 exit(1);
 		 }
     else{
-	   fprintf(stderr, "Miss packet! hooo no!");
+	   if(TEST){
+	         printf("**Miss packet! hooo no!**\n");
                  printf("binfo mcnt:%lu \n", binfo.cur_mcnt);
-                 printf("Packet mcnt:%lu \n", pkt_mcnt);
-	   exit(1);
+                 printf("Packet mcnt:%lu \n\n", pkt_mcnt);
+		   }
            while (( rv = FAST_input_databuf_wait_free(db, binfo.block_idx))!= HASHPIPE_OK) {
                  if (rv==HASHPIPE_TIMEOUT) {
                      hashpipe_status_lock_safe(st_p);
@@ -167,13 +168,14 @@ static inline void miss_pkt_process( uint64_t pkt_mcnt, FAST_input_databuf_t *db
            memset(db->block[binfo.block_idx].data,0,(miss_size)*sizeof(char));
 
 	}
- 	binfo.cur_mcnt = pkt_mcnt + 1 ;
+	binfo.cur_mcnt = pkt_mcnt + N_PACKETS_PER_SPEC - pkt_mcnt % N_PACKETS_PER_SPEC;
+	
 }
 
 
 static inline void process_packet(FAST_input_databuf_t *db,char *packet)
 {
-//    printf("\n ********start !!!******\n\n");
+	
     packet_header_t pkt_header;
     uint64_t pkt_mcnt	= 0;
     int	pkt_source	= 0;
@@ -189,24 +191,28 @@ static inline void process_packet(FAST_input_databuf_t *db,char *packet)
     pkt_source	= pkt_header.source_from;
     pkt_bmtype	= pkt_header.beam_type;
     pkt_beamID	= pkt_header.beam_ID;
-    pkt_dtype	= pkt_header.data_type;// Data type for power term or cross term
-//    fprintf(stderr,"11cur_mcnt: %lu \n",binfo.cur_mcnt);
-//    fprintf(stderr,"11pkt_mcnt: %lu \n",pkt_mcnt);
+    pkt_dtype	= pkt_header.data_type;
     seq =  pkt_mcnt % N_PACKETS_PER_SPEC;
-//    fprintf(stderr,"seq :%d \n ",seq);
-//    fprintf(stderr,"start flag :%d \n ",binfo.start_flag);
+
+    if(TEST){
+	    fprintf(stderr,"**Before start**\n");
+	    fprintf(stderr,"cur_mcnt: %lu \n",binfo.cur_mcnt);
+	    fprintf(stderr,"pkt_mcnt: %lu \n",pkt_mcnt);	
+	    fprintf(stderr,"seq :%d \n ",seq);
+	    fprintf(stderr,"start flag :%d \n\n ",binfo.start_flag);
+	    }
+
     if (seq == 0 || binfo.start_flag ){
-//	printf("\n ********start !!!******\n\n");
+	if(TEST){printf("\n ********start !!!******\n\n");}
         if (total_packets_counted == 0 ){ 
 		binfo.cur_mcnt = pkt_mcnt;
 	}
-//        fprintf(stderr,"22cur_mcnt: %lu \n",binfo.cur_mcnt);
-//        fprintf(stderr,"22pkt_mcnt: %lu \n",pkt_mcnt);
+
         total_packets_counted++;
 
 
         if(binfo.cur_mcnt == pkt_mcnt){
-//	if (binfo.cur_mcnt == pkt_mcnt){
+
 	    while (( rv = FAST_input_databuf_wait_free(db, binfo.block_idx))!= HASHPIPE_OK) {
                    if (rv==HASHPIPE_TIMEOUT) {
                        hashpipe_status_lock_safe(st_p);
@@ -224,11 +230,9 @@ static inline void process_packet(FAST_input_databuf_t *db,char *packet)
 
             // Copy data into buffer
 //            payload_p = (uint64_t *)(p->data+8);
-//	    fprintf(stderr,"Offset before: %lu \n",binfo.offset);
             memcpy((db->block[binfo.block_idx].data)+binfo.offset, packet+8, DATA_SIZE_PACK*sizeof(char));
 	    // Show Status of buffer
             hashpipe_status_lock_safe(st_p);
-            hputi8(st_p->buf,"NETMCNT",binfo.net_mcnt);
             hputi8(st_p->buf,"PKTseq",seq);
             hputi8(st_p->buf,"MiSSPKT",binfo.miss_pkt);
             hashpipe_status_unlock_safe(st_p);
@@ -236,14 +240,11 @@ static inline void process_packet(FAST_input_databuf_t *db,char *packet)
             binfo.offset     += DATA_SIZE_PACK;
             binfo.start_flag  = 1;
             binfo.cur_mcnt   += 1;
-//        fprintf(stderr,"22cur_mcnt: %lu \n",binfo.cur_mcnt);
-//        fprintf(stderr,"22pkt_mcnt: %lu \n",pkt_mcnt);
-	    //printf("Binfo and pkt mcnt: %lu ,%lu",binfo.cur_mcnt, pkt_mcnt);
+
             if (binfo.offset == BUFF_SIZE){
-//	            fprintf(stderr,"Offset already buffsize!: %lu \n",binfo.offset);
-		         // Mark block as full
+	            if(TEST){fprintf(stderr,"\nOffset already buffsize!: %lu \n",binfo.offset);}
+	            // Mark block as full
 	  	    db->block[binfo.block_idx].header.netmcnt +=1;
-//	            fprintf(stderr,"Netmcnt: %lu \n",db->block[binfo.block_idx].header.netmcnt);
 		    if(FAST_input_databuf_set_filled(db, binfo.block_idx) != HASHPIPE_OK) {
 	        	      hashpipe_error(__FUNCTION__, "error waiting for databuf filled call");
         	    	      pthread_exit(NULL);
@@ -256,15 +257,16 @@ static inline void process_packet(FAST_input_databuf_t *db,char *packet)
             }
         }//if (binfo.cur_mcnt == pkt_mcnt)
 
-//        else if(binfo.cur_mcnt < pkt_mcnt){
 
 	else{
-            miss_pkt_process(pkt_mcnt, db);
-            binfo.start_flag = 0;
-        }
+	    
+	            miss_pkt_process(pkt_mcnt, db);
+        	    binfo.start_flag = 0;
+            }
 
     }//(seq == 0 || binfo.start_flag )
-//printf("\n ********End !!!******\n\n");   
+
+if(TEST){printf("\n ********End !!!******\n\n");}
 }
 
 
@@ -272,18 +274,17 @@ static inline void process_packet(FAST_input_databuf_t *db,char *packet)
 
 static void *run(hashpipe_thread_args_t * args)
 {
+    FAST_input_databuf_t *db  = (FAST_input_databuf_t *)args->obuf;
     if(!binfo.initialized) {
         initialize_block_info(&binfo);
+        db->block[binfo.block_idx].header.netmcnt=0;
 	printf("\nInitailized!\n");
     }
 
-    FAST_input_databuf_t *db  = (FAST_input_databuf_t *)args->obuf;
     hashpipe_status_t st = args->st;
-//    const char * status_key = args->thread_desc->skey;
     status_key = args->thread_desc->skey;
     st_p = &st; // allow global (this source file) access to the status buffer
 
-    sleep(2);
     
     /*Start to receive data*/
     struct hashpipe_udp_params up;
@@ -305,7 +306,6 @@ static void *run(hashpipe_thread_args_t * args)
     char *packet;
     packet    = (char *)malloc(PKTSIZE*sizeof(char));
     int pkt_size;
-  //  int pkt_size     = recvfrom(up.sock,packet,PKTSIZE*sizeof(char),0,NULL,NULL);
 
 
     //struct hashpipe_udp_packet p;
@@ -358,22 +358,17 @@ static void *run(hashpipe_thread_args_t * args)
     /* Main loop */
 
     while (run_threads()) {
-	//rcvmb  = nbytes/1024/1024;
         hashpipe_status_lock_safe(&st);
-        hputs(st.buf, status_key, "waiting");
+        hputs(st.buf, status_key, "running");
         hputi4(st.buf, "NETBKOUT", binfo.block_idx);
         hputi8(st.buf, "NPACKETS", total_packets_counted);
-//        hputi8(st.buf, "RCVMB", binfo.rcvmb);
         hashpipe_status_unlock_safe(&st);
 
 //	pkt_size = recv(up.sock, p.data, HASHPIPE_MAX_PACKET_SIZE, 0);
 
 	pkt_size = recvfrom(up.sock,packet,PKTSIZE*sizeof(char),0,NULL,NULL);	
 
-	//if(!run_threads()) {break;}
-//        printf("\n ********start !!!******\n\n");
-//        fprintf(stderr,"000cur_mcnt: %lu \n",binfo.cur_mcnt);
-//	fprintf(stderr,"pkt_size:%d \n",pkt_size);
+	if(!run_threads()) {break;}
 	if (pkt_size == PKTSIZE){
 		 process_packet((FAST_input_databuf_t *)db,packet);
 	}
@@ -385,7 +380,6 @@ static void *run(hashpipe_thread_args_t * args)
         pthread_exit(NULL);
 	}
 */
-//        printf("\n ********End !!!******\n\n");
         pthread_testcancel();
 
      }// Main loop

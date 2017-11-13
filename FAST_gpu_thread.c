@@ -41,7 +41,7 @@ static inline void initialize_block_info(cov_block_info_t * binfo)
 static cov_block_info_t binfo;
 
 
-static polar_data_t  polarization_process(FAST_input_databuf_t *db_in)
+polar_data_t  polarization_process(FAST_input_databuf_t *db_in)
 
 
 {
@@ -57,27 +57,19 @@ static polar_data_t  polarization_process(FAST_input_databuf_t *db_in)
     int	 block_in  = binfo.in_block_idx;
     bool data_type;
     polar_data_t data;
-//    printf("Data_type %d\n",db_in->block[block_in].header.data_type);
-//    printf("sizeof char=%ld\n", sizeof(data) );
 
     data_type = db_in->block[block_in].header.data_type;
- //   printf("Data_type %d\n",data_type);
- //   fprintf(stderr,"sha?????\n");
     if (data_type == 0)
     {	
-     //  fprintf(stderr,"Na ni!!!!!!!\n");
        for(int j=0;j<N_CHANS_BUFF;j++)
 	  {
-//	   fprintf(stderr,"loop j in I : %d\n",j);
 	   data.Polar1[j]  = 
 		        db_in->block[block_in].data[j*N_POLS_CHAN] 
 		      + db_in->block[block_in].data[j*N_POLS_CHAN+1];
-//			fprintf(stderr,"loop j in I : %d\n",j);
 
            data.Polar2[j]  = 
 			db_in->block[block_in].data[j*N_POLS_CHAN]
 		      - db_in->block[block_in].data[j*N_POLS_CHAN+1];
-// 			printf("loop j in Q: %d \n",j);
           }
 
 		
@@ -108,10 +100,6 @@ static void *run(hashpipe_thread_args_t * args)
     hashpipe_status_t st = args->st;
     status_key = args->thread_desc->skey;
     polar_data_t data;
-//    printf("sizeof data=%ld\n", sizeof(data) );	
-//    int binfo.in_block_idx	= binfo.in_block_idx;
-//    int binfo.out_block_idx	= binfo.out_block_idx;
-    uint64_t netmcnt    = db_in->block[binfo.in_block_idx].header.netmcnt;
     int rv;
 
     if(!binfo.initialized) {
@@ -119,11 +107,12 @@ static void *run(hashpipe_thread_args_t * args)
     }
     while (run_threads()) {
 
+	binfo.net_mcnt    = db_in->block[binfo.in_block_idx].header.netmcnt;
         hashpipe_status_lock_safe(&st);
         hputi4(st.buf, "COVT-IN", binfo.in_block_idx);
         hputs(st.buf, status_key, "waiting");
         hputi4(st.buf, "COVT-OUT", binfo.out_block_idx);
-	hputi8(st.buf,"BUFMCNT",netmcnt);
+	hputi8(st.buf,"BUFMCNT",binfo.net_mcnt);
         hashpipe_status_unlock_safe(&st);
 
         // Wait for new input block to be filled
@@ -164,14 +153,12 @@ static void *run(hashpipe_thread_args_t * args)
                 break;
             }
         }
-//	printf("wait for output writting");
-//	exit(1);
-	//db_out->block[binfo.out_block_idx].data ;
-        memcpy(&db_out->block[binfo.out_block_idx].data,&data,N_POLS_CHAN*N_CHANS_BUFF*sizeof(char));
-//	db_out->block[binfo.out_block_idx].data = data;
-//	fprintf(stderr,"Data size: %lu \n",sizeof(data));
-//	fprintf(stderr,"Block Data size: %lu \n",sizeof(db_out->block[binfo.out_block_idx].data));
-	//exit(1);
+	memcpy(&db_out->block[binfo.out_block_idx].data,&data,sizeof(polar_data_t));
+	if (TEST){
+		fprintf(stderr,"**Net tread**\n");
+		fprintf(stderr,"wait for output writting..\n");
+		fprintf(stderr,"Data size: %lu \n\n",sizeof(data));
+		}
         // Mark output block as full and advance
         FAST_output_databuf_set_filled(db_out,binfo.out_block_idx);
         binfo.out_block_idx = (binfo.out_block_idx + 1) % db_out->header.n_block;		

@@ -784,7 +784,7 @@ void WriteHeader(const char * fname)
 	double Fch1 = 4096;//1644.72656-.25634765/2.;
 	double Foff = -0.25634765;
 	int Nchans  = N_CHANS_SPEC;
-	float Tsamp = pow(2,8)*8192/2.1/pow(10,9);
+	float Tsamp = 1//pow(2,8)*8192/2.1/pow(10,9);
 	int Nbits   = N_BITS_DATA_POINT;
 	int Nifs=1;//N_POLS_CHAN;
 	int start=time((time_t*)NULL);
