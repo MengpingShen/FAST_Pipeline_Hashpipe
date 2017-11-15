@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <pthread.h>
 #include <sys/time.h>
@@ -18,7 +19,6 @@
 static const char * status_key;
 
 typedef struct {
-    uint64_t    net_mcnt;
     bool        initialized;
     int         out_block_idx;
     int 	in_block_idx;
@@ -34,7 +34,6 @@ static inline void initialize_block_info(cov_block_info_t * binfo)
 
     binfo->in_block_idx     = 0;
     binfo->out_block_idx    = 0;
-    binfo->net_mcnt	    = 0;
     binfo->initialized	    = 1;
 }
 
@@ -64,12 +63,12 @@ polar_data_t  polarization_process(FAST_input_databuf_t *db_in)
        for(int j=0;j<N_CHANS_BUFF;j++)
 	  {
 	   data.Polar1[j]  = 
-		        db_in->block[block_in].data[j*N_POLS_CHAN] 
-		      + db_in->block[block_in].data[j*N_POLS_CHAN+1];
+		        db_in->block[block_in].data[j*N_POLS_PKT] 
+		      + db_in->block[block_in].data[j*N_POLS_PKT+1];
 
            data.Polar2[j]  = 
-			db_in->block[block_in].data[j*N_POLS_CHAN]
-		      - db_in->block[block_in].data[j*N_POLS_CHAN+1];
+			db_in->block[block_in].data[j*N_POLS_PKT]
+		      - db_in->block[block_in].data[j*N_POLS_PKT+1];
           }
 
 		
@@ -80,12 +79,12 @@ polar_data_t  polarization_process(FAST_input_databuf_t *db_in)
           {
 
            data.Polar1[j] = 
-			db_in->block[block_in].data[j*N_POLS_CHAN]
-		      + db_in->block[block_in].data[j*N_POLS_CHAN+1];
+			db_in->block[block_in].data[j*N_POLS_PKT]
+		      + db_in->block[block_in].data[j*N_POLS_PKT+1];
 
            data.Polar2[j] = 
-			db_in->block[block_in].data[j*N_POLS_CHAN]
-		      - db_in->block[block_in].data[j*N_POLS_CHAN+1];
+			db_in->block[block_in].data[j*N_POLS_PKT]
+		      - db_in->block[block_in].data[j*N_POLS_PKT+1];
 	  }
     }
     return data;
@@ -107,12 +106,11 @@ static void *run(hashpipe_thread_args_t * args)
     }
     while (run_threads()) {
 
-	binfo.net_mcnt    = db_in->block[binfo.in_block_idx].header.netmcnt;
+//	uint64_t netmcnt    = db_in->block[binfo.in_block_idx].header.netmcnt;
         hashpipe_status_lock_safe(&st);
         hputi4(st.buf, "COVT-IN", binfo.in_block_idx);
         hputs(st.buf, status_key, "waiting");
         hputi4(st.buf, "COVT-OUT", binfo.out_block_idx);
-	hputi8(st.buf,"BUFMCNT",binfo.net_mcnt);
         hashpipe_status_unlock_safe(&st);
 
         // Wait for new input block to be filled
@@ -134,8 +132,10 @@ static void *run(hashpipe_thread_args_t * args)
         hashpipe_status_lock_safe(&st);
         hputs(st.buf, status_key, "processing");
         hashpipe_status_unlock_safe(&st);
-	
-        data = polarization_process(db_in);
+
+	// Process Data with polarization
+	data = polarization_process(db_in);
+
         // Mark input block as free and advance
         FAST_input_databuf_set_free(db_in, binfo.in_block_idx);
         binfo.in_block_idx = (binfo.in_block_idx + 1) % db_in->header.n_block;
@@ -153,7 +153,11 @@ static void *run(hashpipe_thread_args_t * args)
                 break;
             }
         }
+
+	/*Copy Data to buffer*/
 	memcpy(&db_out->block[binfo.out_block_idx].data,&data,sizeof(polar_data_t));
+
+
 	if (TEST){
 		fprintf(stderr,"**Net tread**\n");
 		fprintf(stderr,"wait for output writting..\n");

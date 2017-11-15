@@ -2,7 +2,8 @@
  * FAST_output_thread.c
  * 
  */
-
+//#include <stdlib.h>
+//#include <cstdio>
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
@@ -16,8 +17,8 @@
 //#include "FAST_net_thread.h"
 //#include "FAST_net_thread.c"
 //static int block_idx=0;
-//extern bool store_flag;
-extern long  miss_gap;
+extern int beam_ID;
+//extern long  miss_gap;
 static void *run(hashpipe_thread_args_t * args)
 {
 	printf("\n%f Mbytes for each Filterbank file.\n ",float(N_BYTES_PER_FILE)/1024/1024);
@@ -34,7 +35,6 @@ static void *run(hashpipe_thread_args_t * args)
 	int filb_flag = 1;
 	FILE * FAST_file;
 	sleep(1);
-
 	/* Main loop */
 	while (run_threads()) {
 		hashpipe_status_lock_safe(&st);
@@ -65,13 +65,16 @@ static void *run(hashpipe_thread_args_t * args)
 		hputi4(st.buf, "OUTBLKIN", block_idx);
 		hashpipe_status_unlock_safe(&st);
 		if (filb_flag ==1){
-			char    f_fil[256];
 			struct tm  *now;
 			time_t rawtime;
 			printf("\n\nopen new filterbank file...\n\n");
+                        char f_fil[250];
+			char File_dir[] = "/tmp/2017_Nov_12/B";
+			char t_stamp[50];
 	        	time(&rawtime);
 			now = localtime(&rawtime);
-		        strftime(f_fil,sizeof(f_fil), "/tmp/2017_Nov_12/Beam_%Y-%m-%d_%H-%M-%S.fil",now);
+		        strftime(t_stamp,sizeof(t_stamp), "_%Y-%m-%d_%H-%M-%S.fil",now);
+			sprintf(f_fil,"%s%d%s" ,File_dir,beam_ID,t_stamp);
 			WriteHeader(f_fil);
 			printf("write header done!\n");
 			N_files += 1;
@@ -80,9 +83,10 @@ static void *run(hashpipe_thread_args_t * args)
 		}
 	
                 fwrite(db->block[block_idx].data.Polar1,sizeof(db->block[block_idx].data.Polar1),1,FAST_file);
-		N_Bytes_save += BUFF_SIZE/N_POLS_CHAN;		
+		N_Bytes_save += BUFF_SIZE/N_POLS_PKT;		
 		if (TEST){
 			printf("**Save Information**\n");
+			printf("beam_ID:%d \n",beam_ID);
 			printf("Buffsize: %lu",BUFF_SIZE);
 			printf("flib_flag:%d\n",filb_flag);
 			printf("Data save:%f\n",float(N_Bytes_save)/1024/1024);

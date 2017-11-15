@@ -9,6 +9,7 @@
 #include <math.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdbool.h>
 #include <pthread.h>
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -19,6 +20,7 @@
 //#include "FAST_net_thread.h"
 //defining a struct of type hashpipe_udp_params as defined in hashpipe_udp.h
 //unsigned long long miss_pkt = 0;
+int	beam_ID;
 static int total_packets_counted = 0;
 static hashpipe_status_t *st_p;
 static  const char * status_key;
@@ -39,7 +41,7 @@ typedef struct {
     uint64_t    mcnt;            // counter for packet
     bool        source_from;    // 0 - power spectra, 1 - pure ADC sample
     bool        beam_type;      // 0 - single beam, 1 - multi-beam
-    int         beam_ID;        // beam ID
+    int         Beam_ID;        // beam ID
     bool	data_type;	// spectra: 0 - power term, 1 - cross term
 } packet_header_t;
 
@@ -81,7 +83,7 @@ static inline void get_header( packet_header_t * pkt_header, char *packet)
     pkt_header->mcnt        = raw_header  & 0x00ffffffffffffff; 
     pkt_header->source_from = raw_header  & 0x8000000000000000; //0 - power spectra, 1 - pure ADC sample
     pkt_header->beam_type   = raw_header  & 0x4000000000000000; //0 - single beam, 1 - multi-beam
-    pkt_header->beam_ID     = raw_header  & 0x3e00000000000000; //5 bits, 32 values for beam. multi-beam: 1-19
+    pkt_header->Beam_ID     = raw_header  & 0x3e00000000000000; //5 bits, 32 values for beam. multi-beam: 1-19
     pkt_header->data_type   = raw_header  & 0x0100000000000000; //spectra: 0 - power term, 1 - cross term
     if (TEST){
 	    fprintf(stderr,"**Header**\n");
@@ -190,9 +192,12 @@ static inline void process_packet(FAST_input_databuf_t *db,char *packet)
     pkt_mcnt	= pkt_header.mcnt;
     pkt_source	= pkt_header.source_from;
     pkt_bmtype	= pkt_header.beam_type;
-    pkt_beamID	= pkt_header.beam_ID;
+    pkt_beamID	= pkt_header.Beam_ID;
     pkt_dtype	= pkt_header.data_type;
     seq =  pkt_mcnt % N_PACKETS_PER_SPEC;
+    // Copy Header Information
+    db->block[binfo.block_idx].header.data_type = pkt_dtype;
+    beam_ID   = pkt_beamID;
 
     if(TEST){
 	    fprintf(stderr,"**Before start**\n");
@@ -244,7 +249,7 @@ static inline void process_packet(FAST_input_databuf_t *db,char *packet)
             if (binfo.offset == BUFF_SIZE){
 	            if(TEST){fprintf(stderr,"\nOffset already buffsize!: %lu \n",binfo.offset);}
 	            // Mark block as full
-	  	    db->block[binfo.block_idx].header.netmcnt +=1;
+//	  	    db->block[binfo.block_idx].header.netmcnt +=1;
 		    if(FAST_input_databuf_set_filled(db, binfo.block_idx) != HASHPIPE_OK) {
 	        	      hashpipe_error(__FUNCTION__, "error waiting for databuf filled call");
         	    	      pthread_exit(NULL);
@@ -311,7 +316,7 @@ static void *run(hashpipe_thread_args_t * args)
     //struct hashpipe_udp_packet p;
 
     /* Give all the threads a chance to start before opening network socket */
-    sleep(1);
+    sleep(2);
 
 
 

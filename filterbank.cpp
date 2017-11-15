@@ -706,7 +706,7 @@ void FilterBankData::ZeroDM(const string method)
 }
 /**\brief 写filterbank数据
  * */
-bool FilterBankData::WriteHeaderToFile(const char* fname)
+ bool FilterBankData::WriteHeaderToFile(const char* fname)
 {
 	FILE * f_fil;
 	f_fil=fopen(fname, "w");
@@ -778,15 +778,16 @@ bool FilterBankData::WriteHeaderToFile(const char* fname)
 	return 0;
 
 }
-void WriteHeader(const char * fname)
+ void WriteHeader(const char * fname)
 //void WriteHeader(FILE * fname)
 {
-	double Fch1 = 4096;//1644.72656-.25634765/2.;
+	
+	double Fch1 = 1400;
 	double Foff = -0.25634765;
 	int Nchans  = N_CHANS_SPEC;
-	float Tsamp = 1//pow(2,8)*8192/2.1/pow(10,9);
+	float Tsamp = 0.001;//(s )
 	int Nbits   = N_BITS_DATA_POINT;
-	int Nifs=1;//N_POLS_CHAN;
+	int Nifs=1;//N_POLS_PKT;
 	int start=time((time_t*)NULL);
 	double current_MJD;
 	double Year;
@@ -828,7 +829,7 @@ void WriteHeader(const char * fname)
 	fil.Foff=Foff;
 	fil.Nchans=Nchans;
 	fil.Nbits=Nbits;
-	fil.Nbeams=1;
+	fil.Nbeams=N_BEAM;
 	fil.Nifs=Nifs;
 	fil.RefDM=0;
 	//fil.Nsamples=Nsl/Nchans/Nifs;

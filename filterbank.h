@@ -59,7 +59,7 @@ public:
 	~SubBandData(void);
 	void Free(void);
 };
-class FilterBankData
+ class FilterBankData
 {
 public:
 
