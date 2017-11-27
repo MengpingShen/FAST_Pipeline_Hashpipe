@@ -816,8 +816,8 @@ void FilterBankData::ZeroDM(const string method)
 	FilterBankData fil;
 	strcpy(fil.Source_name, "B0329+54");
 	fil.UseFrequencyTable=false;
-	//fil.Telescope_id=1;
-	//fil.Machine_id=1;
+	fil.Telescope_id=0;
+	fil.Machine_id=0;
 	fil.Data_type=0;
 	fil.Az_start=0;
 	fil.Za_start=0;

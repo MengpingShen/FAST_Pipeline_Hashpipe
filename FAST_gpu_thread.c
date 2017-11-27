@@ -74,8 +74,9 @@ polar_data_t  polarization_process(FAST_input_databuf_t *db_in)
 		
     }
     else if (data_type = 1)
-    {
+    {	
        for(int j=0;j<N_CHANS_BUFF;j++)
+	
           {
 
            data.Polar1[j] = 
