@@ -18,7 +18,8 @@
 //#include "FAST_net_thread.c"
 //static int block_idx=0;
 extern int beam_ID;
-//extern long  miss_gap;
+extern bool data_type;
+extern bool start_file;
 static void *run(hashpipe_thread_args_t * args)
 {
 	printf("\n%f Mbytes for each Filterbank file.\n ",float(N_BYTES_PER_FILE)/1024/1024);
@@ -33,7 +34,8 @@ static void *run(hashpipe_thread_args_t * args)
 	uint64_t N_Bytes_save = 0;
 	uint64_t N_Bytes_file = N_BYTES_PER_FILE;
 	int filb_flag = 1;
-	FILE * FAST_file;
+	FILE * FAST_file_Polar_1;
+	FILE * FAST_file_Polar_2;
 	sleep(1);
 	/* Main loop */
 	while (run_threads()) {
@@ -64,25 +66,37 @@ static void *run(hashpipe_thread_args_t * args)
 		hputs(st.buf, status_key, "processing");
 		hputi4(st.buf, "OUTBLKIN", block_idx);
 		hashpipe_status_unlock_safe(&st);
-		if (filb_flag ==1){
+		if (filb_flag ==1 && start_file ==1 ){
 			struct tm  *now;
 			time_t rawtime;
+			char P[4] = {'I','Q','U','V'};
 			printf("\n\nopen new filterbank file...\n\n");
-                        char f_fil[250];
+                        char f_fil_P1[250];
+			char f_fil_P2[250];
 			char File_dir[] = "/tmp/2017_Nov_12/B";
 			char t_stamp[50];
 	        	time(&rawtime);
 			now = localtime(&rawtime);
 		        strftime(t_stamp,sizeof(t_stamp), "_%Y-%m-%d_%H-%M-%S.fil",now);
-			sprintf(f_fil,"%s%d%s" ,File_dir,beam_ID,t_stamp);
-			WriteHeader(f_fil);
+                        if (data_type ==0 ){
+	                        sprintf(f_fil_P1,"%s%d%s%c%s" ,File_dir,beam_ID,"_",P[0],t_stamp);
+	                        sprintf(f_fil_P2,"%s%d%s%c%s" ,File_dir,beam_ID,"_",P[1],t_stamp);
+			}else if(data_type ==1 ){
+			        sprintf(f_fil_P1,"%s%d%s%c%s" ,File_dir,beam_ID,"_",P[2],t_stamp);
+	                        sprintf(f_fil_P2,"%s%d%s%c%s" ,File_dir,beam_ID,"_",P[3],t_stamp);
+			}
+			
+			WriteHeader(f_fil_P1);
+			WriteHeader(f_fil_P2);
 			printf("write header done!\n");
 			N_files += 1;
-			FAST_file=fopen(f_fil,"a+");
-		        printf("starting write data to %s...\n",f_fil);
+			FAST_file_Polar_1=fopen(f_fil_P1,"a+");
+			FAST_file_Polar_2=fopen(f_fil_P2,"a+");
+		        printf("starting write data to %s \nand  %s...\n",f_fil_P1,f_fil_P2);
 		}
 	
-                fwrite(db->block[block_idx].data.Polar1,sizeof(db->block[block_idx].data.Polar1),1,FAST_file);
+                fwrite(db->block[block_idx].data.Polar1,sizeof(db->block[block_idx].data.Polar1),1,FAST_file_Polar_1);
+                fwrite(db->block[block_idx].data.Polar2,sizeof(db->block[block_idx].data.Polar2),1,FAST_file_Polar_2);
 		N_Bytes_save += BUFF_SIZE/N_POLS_PKT;		
 		if (TEST){
 			printf("**Save Information**\n");
@@ -110,7 +124,8 @@ static void *run(hashpipe_thread_args_t * args)
 		pthread_testcancel();
 
 	}
-	fclose(FAST_file);
+	fclose(FAST_file_Polar_1);
+	fclose(FAST_file_Polar_2);
 	return THREAD_OK;
 }
 

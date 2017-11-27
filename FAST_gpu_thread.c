@@ -17,6 +17,7 @@
 #include "math.h"
 
 static const char * status_key;
+extern bool data_type;
 
 typedef struct {
     bool        initialized;
@@ -54,10 +55,8 @@ polar_data_t  polarization_process(FAST_input_databuf_t *db_in)
 */
     
     int	 block_in  = binfo.in_block_idx;
-    bool data_type;
     polar_data_t data;
 
-    data_type = db_in->block[block_in].header.data_type;
     if (data_type == 0)
     {	
        for(int j=0;j<N_CHANS_BUFF;j++)

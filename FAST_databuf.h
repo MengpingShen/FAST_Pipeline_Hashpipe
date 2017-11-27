@@ -48,7 +48,6 @@ typedef struct polar_data {
 /* INPUT BUFFER STRUCTURES*/
 typedef struct FAST_input_block_header {
    uint64_t	netmcnt;        // Counter for ring buffer
-   bool		data_type;	// Spectra: 0 - power term, 1 - cross term
    		
 } FAST_input_block_header_t;
 
