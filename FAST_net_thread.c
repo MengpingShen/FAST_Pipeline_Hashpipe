@@ -295,9 +295,10 @@ static void *run(hashpipe_thread_args_t * args)
     
     /*Start to receive data*/
     struct hashpipe_udp_params up;
-    strcpy(up.bindhost,"10.10.13.3");
+    strcpy(up.bindhost,"0.0.0.0");
     up.bindport = 12345;
-//    up.packet_size = PKTSIZE;
+    up.packet_size = PKTSIZE;
+    sleep(1);   		
     struct hashpipe_udp_packet p;   
 
 
