@@ -11,7 +11,8 @@ There are 2 buffers between three threads, each of them is a 3 segment ring buff
 Required:
   Hashpipe
   Ruby 2.1.2
-  Install information: See: https://github.com/peterniuzai/Work_memo.git/hashpipe_install.pdf
+  Install information: See:
+  https://github.com/peterniuzai/Work_memo/blob/master/hashpipe_install.pdf
 
 Make file  
   This pipeline including c for hashpipe and c++ for filterbank data formate convert(Written by K.J.Li).
