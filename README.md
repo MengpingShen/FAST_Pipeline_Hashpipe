@@ -1,7 +1,13 @@
 # FAST_Pipeline_Hashpipe
 This is thread manage pipeline for FAST FRB backend. 
-The data are store in a Ram for temperory store. When found a candidate, the data will be store into Disk.
-This part only include the former packet receiving, dissambling, and Filterbank data formate convertion.
+The data are store in a Ram for temporary storage. When found a candidate, the data will be store into Disk.
+This part include the former packet receiving, dissambling, and Filterbank data formate convertion. It has 3 threads:
+  FAST_net_thread; (Packet receving)
+  FAST_gpu_thread; ("gpu" is just a tradition to use, it has no GPU at all! Charge for stocks parameter re-assemble)
+  FAST_output_thread; (Output data into RAM)
+ 
+There are 2 buffers between three threads, each of them is a 3 segment ring buffer. Buffer status could be abstracted from each ring buffer.
+
 Required:
   Hashpipe
   Ruby 2.1.2
