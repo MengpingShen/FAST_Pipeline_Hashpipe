@@ -25,7 +25,7 @@
 #define N_BYTES_PER_SPEC	(DATA_SIZE_PACK*N_PACKETS_PER_SPEC)					//Spectrum size with polarations
 #define BUFF_SIZE		(unsigned long)(N_SPEC_BUFF*N_BYTES_PER_SPEC) 				//Buffer size with polarations
 #define N_CHANS_BUFF		(N_SPEC_BUFF*N_CHANS_SPEC)     						//Channels in one buffer without polarations
-#define N_SPEC_PER_FILE		1199616 			// Number of spectrums per file \
+#define N_SPEC_PER_FILE		1199616/4 			// Number of spectrums per file \
 				int{time(s)/T_samp(s)/N_SPEC_BUFF}*N_SPEC_BUFF  e.g. 20s data: int(20/0.001/128)*128
 #define N_BYTES_PER_FILE	(N_SPEC_PER_FILE * N_BYTES_PER_SPEC / N_POLS_PKT) 			// we can save (I,Q,U,V) polaration into disk. 
 

@@ -36,6 +36,9 @@ static void *run(hashpipe_thread_args_t * args)
 	int filb_flag = 1;
 	FILE * FAST_file_Polar_1;
 	FILE * FAST_file_Polar_2;
+	char f_fil_P1[250];
+	char f_fil_P2[250];
+
 	sleep(1);
 	/* Main loop */
 	while (run_threads()) {
@@ -71,13 +74,12 @@ static void *run(hashpipe_thread_args_t * args)
 			time_t rawtime;
 			char P[4] = {'I','Q','U','V'};
 			printf("\n\nopen new filterbank file...\n\n");
-                        char f_fil_P1[250];
-			char f_fil_P2[250];
 			char File_dir[] = "/tmp/2017_Nov_12/B";
 			char t_stamp[50];
 	        	time(&rawtime);
 			now = localtime(&rawtime);
-		        strftime(t_stamp,sizeof(t_stamp), "_%Y-%m-%d_%H-%M-%S.fil",now);
+		        strftime(t_stamp,sizeof(t_stamp), "_%Y-%m-%d_%H-%M-%S.fil.working",now);
+
                         if (data_type ==0 ){
 	                        sprintf(f_fil_P1,"%s%d%s%c%s" ,File_dir,beam_ID,"_",P[0],t_stamp);
 	                        sprintf(f_fil_P2,"%s%d%s%c%s" ,File_dir,beam_ID,"_",P[1],t_stamp);
@@ -88,17 +90,22 @@ static void *run(hashpipe_thread_args_t * args)
 			
 			WriteHeader(f_fil_P1);
 			WriteHeader(f_fil_P2);
+	
 			printf("write header done!\n");
+	
 			N_files += 1;
 			FAST_file_Polar_1=fopen(f_fil_P1,"a+");
 			FAST_file_Polar_2=fopen(f_fil_P2,"a+");
+	
 		        printf("starting write data to %s \nand  %s...\n",f_fil_P1,f_fil_P2);
 		}
 	
                 fwrite(db->block[block_idx].data.Polar1,sizeof(db->block[block_idx].data.Polar1),1,FAST_file_Polar_1);
                 fwrite(db->block[block_idx].data.Polar2,sizeof(db->block[block_idx].data.Polar2),1,FAST_file_Polar_2);
 		N_Bytes_save += BUFF_SIZE/N_POLS_PKT;		
+	
 		if (TEST){
+
 			printf("**Save Information**\n");
 			printf("beam_ID:%d \n",beam_ID);
 			printf("Buffsize: %lu",BUFF_SIZE);
@@ -109,12 +116,21 @@ static void *run(hashpipe_thread_args_t * args)
 
 			}
 
-			if (N_Bytes_save % N_Bytes_file ==0){
-					filb_flag = 1;
-					}
-			else{
-					filb_flag = 0;
-					}		
+		if (N_Bytes_save % N_Bytes_file ==0){
+
+			filb_flag = 1;
+                        char Filname_P1[250]={""};
+                        char Filname_P2[250]={""};
+                        strncpy(Filname_P1, f_fil_P1, strlen(f_fil_P1)-8);
+                        strncpy(Filname_P2, f_fil_P2, strlen(f_fil_P2)-8);
+                        rename(f_fil_P1,Filname_P1);
+                        rename(f_fil_P2,Filname_P2);
+			}
+
+		else{
+			filb_flag = 0;
+
+			}		
 
 		FAST_output_databuf_set_free(db,block_idx);
 		block_idx = (block_idx + 1) % db->header.n_block;
