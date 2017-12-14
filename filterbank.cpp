@@ -785,7 +785,7 @@ void FilterBankData::ZeroDM(const string method)
 	double Fch1 = 1400;
 	double Foff = -0.25634765;
 	int Nchans  = N_CHANS_SPEC;
-	float Tsamp = 0.001;//(s )
+	float Tsamp = 0.000025;//(s )
 	int Nbits   = N_BITS_DATA_POINT;
 	int Nifs=1;//N_POLS_PKT;
 	int start=time((time_t*)NULL);
